@@ -145,13 +145,43 @@
 
   /* 증강 비교 */
   .cmp { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
-  @media (min-width: 560px) { .cmp { grid-template-columns: 1fr 1fr 1fr auto; } }
+  @media (min-width: 900px) { .cmp { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto; } }
   .cmp input { width: 100%; padding: 11px 12px; font-size: 15px; border-radius: 10px; border: 1px solid var(--line);
                background: #0d1319; color: var(--text); }
   .cmp input:focus { outline: 2px solid #0ac8b977; border-color: transparent; }
   .cmp button { padding: 11px 18px; font-size: 15px; font-weight: 700; border: 0; border-radius: 10px; cursor: pointer;
                 background: var(--teal); color: #032a27; }
+  .slot { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: start; min-width: 0;
+          padding: 8px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+  .slot-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .slot-row { display: flex; gap: 6px; }
+  .slot label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; padding-left: 2px; cursor: pointer; }
+  .slot input[type=checkbox] { width: 16px; height: 16px; padding: 0; accent-color: var(--teal); }
+  .slot .info { font-size: 12px; color: var(--muted); min-height: 16px; padding-left: 2px; }
+  .cmp .rr { padding: 0 10px; font-size: 13px; font-weight: 700; border-radius: 8px; border: 1px solid #c8aa6e88;
+             background: transparent; color: var(--gold-hi); cursor: pointer; flex: none; }
+
+  /* 등급 배지 (S~D) */
+  .grade { display: inline-flex; align-items: center; justify-content: center; font-weight: 900; border-radius: 10px;
+           width: 52px; height: 52px; font-size: 28px; background: #ffffff0d; color: var(--muted); flex: none;
+           border: 1px solid #ffffff14; font-family: "Segoe UI", system-ui, sans-serif; }
+  .grade.sm { width: 26px; height: 26px; font-size: 14px; border-radius: 7px; }
+  .grade.S { background: linear-gradient(160deg, #ffd66b, #f08c00); color: #2a1600; border-color: #ffd66b; box-shadow: 0 0 18px #f08c0066; }
+  .grade.A { background: linear-gradient(160deg, #cfa8ff, #8a4dff); color: #1a0838; border-color: #cfa8ff; }
+  .grade.B { background: linear-gradient(160deg, #8fb8ff, #3b74e8); color: #061a3d; border-color: #8fb8ff; }
+  .grade.C { background: linear-gradient(160deg, #8fe8bf, #2aa872); color: #06251a; border-color: #8fe8bf; }
+  .grade.D { background: #3a4350; color: #c9d3de; border-color: #556070; }
+  .aug .grade { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; font-size: 18px; }
+  .aug-s .grade { margin-right: 2px; }
+  .cmp button { align-self: start; }
   .cmp-out { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .verdict { padding: 14px 16px; border-radius: 12px; font-size: 17px; font-weight: 800; line-height: 1.4; }
+  .verdict.reroll { background: linear-gradient(90deg, #c8aa6e33, #c8aa6e0a); border: 1px solid #c8aa6e88; color: var(--gold-hi); }
+  .verdict.pick { background: linear-gradient(90deg, #3ccf8e33, #3ccf8e0a); border: 1px solid #3ccf8e88; color: #9ff0c9; }
+  .act { font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 999px; margin-left: auto; white-space: nowrap; align-self: center; }
+  .act.리롤 { background: var(--gold); color: #1a1408; }
+  .act.선택 { background: var(--green); color: #06251a; }
+  .act.유지, .act.리롤함, .act.정보 { background: #ffffff14; color: var(--muted); }
   .err { color: #ffb3bf; font-size: 14px; }
 
   .empty { text-align: center; padding: 60px 16px; color: var(--muted); }
@@ -166,15 +196,25 @@
   <div class="top" id="top"></div>
   <div id="main"></div>
 
-  <div class="card" style="margin-top:16px">
-    <h2>증강 선택지 비교 <span class="hint">선택 화면에 나온 증강 3개를 입력</span></h2>
+  <div class="card" id="cmp-card" style="margin:16px 0">
+    <h2>증강 선택지 비교 · 리롤 판단 <span class="hint">선택 화면의 증강 3개 입력, 이미 리롤한 칸은 체크</span></h2>
+    <div class="note" style="margin:-4px 0 12px">증강 이름을 입력하면 <b>바로 등급(S~D)</b>이 뜨고, <b>리롤할지 그냥 뽑을지</b> 알려줍니다.
+      카드를 리롤했으면 그 칸의 <b>리롤</b> 버튼을 누르고 새 증강 이름을 입력하세요.
+      등급은 내 챔피언이 받을 수 있는 증강 중 지금 상황 점수 상위 %입니다 (S 10%, A 30%, B 60%, C 85%, 나머지 D).</div>
     <form class="cmp" id="cmp">
-      <input name="c" list="augnames" placeholder="첫 번째 증강" autocomplete="off">
-      <input name="c" list="augnames" placeholder="두 번째 증강" autocomplete="off">
-      <input name="c" list="augnames" placeholder="세 번째 증강" autocomplete="off">
+      <div class="slot"><div class="grade">?</div><div class="slot-main">
+        <div class="slot-row"><input name="c" list="augnames" placeholder="첫 번째 증강" autocomplete="off"><button type="button" class="rr">리롤</button></div>
+        <label><input type="checkbox">리롤함</label><div class="info"></div></div></div>
+      <div class="slot"><div class="grade">?</div><div class="slot-main">
+        <div class="slot-row"><input name="c" list="augnames" placeholder="두 번째 증강" autocomplete="off"><button type="button" class="rr">리롤</button></div>
+        <label><input type="checkbox">리롤함</label><div class="info"></div></div></div>
+      <div class="slot"><div class="grade">?</div><div class="slot-main">
+        <div class="slot-row"><input name="c" list="augnames" placeholder="세 번째 증강" autocomplete="off"><button type="button" class="rr">리롤</button></div>
+        <label><input type="checkbox">리롤함</label><div class="info"></div></div></div>
       <button type="submit">비교</button>
     </form>
     <datalist id="augnames"></datalist>
+    <div class="note" id="cmp-auto" style="margin-top:10px;color:var(--teal)"></div>
     <div class="cmp-out" id="cmp-out"></div>
   </div>
 
@@ -249,14 +289,17 @@ function renderBuy(v) {
   return `<div class="card hero"><h2>지금 살 것 <span class="hint">${v.gold != null ? `보유 ${won(v.gold)}${sold}` : ""}</span></h2>${body}</div>`;
 }
 
+const grade = (g, cls = "") => g ? `<span class="grade ${cls} ${esc(g)}">${esc(g)}</span>` : "";
+
 function renderAugments(v) {
   if (!v.augments.length) return "";
   const top = v.augments.slice(0, 3), more = v.augments.slice(3);
-  const banner = v.augment_first ? `<div class="aug-banner"><span class="dot"></span>증강 선택 가능! 상점에서 증강을 고르세요</div>` : "";
-  return `<div class="card ${v.augment_first ? "hero" : ""}"><h2>추천 증강 <span class="hint">OP.GG 성능 + 상황 보정</span></h2>${banner}
-    <div class="augs-top">${top.map((a, i) => `<div class="aug ${i === 0 ? "first" : ""}"><span class="rank">${i + 1}</span>
-      ${img(a.icon, a.name)}<div><div class="nm">${esc(a.name)}</div><div class="sc">점수 ${a.score}${a.tier && a.tier !== "-" ? ` · ${a.tier}등급` : ""}</div>${tags(a.reasons)}</div></div>`).join("")}</div>
-    ${more.length ? `<div class="augs-more">${more.map((a, i) => `<div class="aug-s">${img(a.icon, a.name)}<span>${i + 4}. <b>${esc(a.name)}</b> · ${a.score}</span></div>`).join("")}</div>` : ""}
+  const banner = v.augment_first ? `<div class="aug-banner"><span class="dot"></span>증강 선택 가능! 상점에서 증강을 고르세요
+      <a href="#cmp-card" style="margin-left:auto;color:inherit;font-weight:600;font-size:13px">선택지 입력 → 리롤 판단</a></div>` : "";
+  return `<div class="card ${v.augment_first ? "hero" : ""}"><h2>추천 증강 <span class="hint">등급 = 받을 수 있는 증강 중 상위 %</span></h2>${banner}
+    <div class="augs-top">${top.map((a, i) => `<div class="aug ${i === 0 ? "first" : ""}"><span class="rank">${i + 1}</span>${grade(a.grade)}
+      ${img(a.icon, a.name)}<div><div class="nm">${esc(a.name)}</div><div class="sc">점수 ${a.score}</div>${tags(a.reasons)}</div></div>`).join("")}</div>
+    ${more.length ? `<div class="augs-more">${more.map((a, i) => `<div class="aug-s">${grade(a.grade, "sm")}${img(a.icon, a.name)}<span>${i + 4}. <b>${esc(a.name)}</b> · ${a.score}</span></div>`).join("")}</div>` : ""}
   </div>`;
 }
 
@@ -291,12 +334,38 @@ function render(d) {
   const main = document.getElementById("main");
   if (!v) {
     main.innerHTML = `<div class="card empty"><div class="big">${esc(d.status)}</div>죽거나 게임이 시작되면 추천이 여기에 표시됩니다.</div>`;
+    handleScreen(d.screen);
     return;
   }
   const left = v.augment_first ? renderAugments(v) + renderBuy(v) + renderItems(v)
                                : renderBuy(v) + renderAugments(v) + renderItems(v);
   main.innerHTML = `<div class="grid"><div class="col">${left}</div>
     <div class="col">${v.teams.map(t => renderTeam(t)).join("")}</div></div>`;
+  placeCompare(v.augment_first || !!d.screen);
+  handleScreen(d.screen);
+}
+
+// 화면에서 증강 선택지를 새로 읽으면 입력칸을 채우고 바로 비교한다 (리롤한 칸은 자동 체크)
+let lastScreenSeq = null;
+function handleScreen(s) {
+  if (!s || s.seq === lastScreenSeq) return;
+  lastScreenSeq = s.seq;
+  slots.forEach((slot, i) => {
+    slot.querySelector("input[name=c]").value = s.names[i] || "";
+    slot.querySelector("input[type=checkbox]").checked = !!s.rerolled[i];
+  });
+  document.getElementById("cmp-auto").textContent =
+    `📷 게임 화면에서 읽은 선택지입니다 (${new Date().toLocaleTimeString("ko-KR")}). 리롤하면 자동으로 다시 읽습니다.`;
+  placeCompare(true);
+  compare(true);
+}
+
+// 증강을 고를 수 있을 때는 비교·리롤 칸을 추천 위로 올린다.
+// 입력 중인 내용이 지워지지 않도록 다시 그리지 않고 위치만 옮긴다.
+function placeCompare(top) {
+  const card = document.getElementById("cmp-card"), main = document.getElementById("main");
+  if (top && card.nextElementSibling !== main) main.before(card);
+  if (!top && card.previousElementSibling !== main) main.after(card);
 }
 
 async function poll() {
@@ -319,29 +388,95 @@ async function loadNames() {
     const names = await (await fetch("/names")).json();
     if (!names.length) return;
     document.getElementById("augnames").innerHTML = names.map(n => `<option value="${esc(n)}">`).join("");
+    names.forEach(n => knownNames.add(n));
     namesLoaded = true;
   } catch (e) {}
 }
 
-document.getElementById("cmp").addEventListener("submit", async e => {
-  e.preventDefault();
+const slots = [...document.querySelectorAll("#cmp .slot")];
+const knownNames = new Set();
+let compareSeq = 0, compareTimer = null;
+
+function setSlot(slot, g, info) {
+  const badge = slot.querySelector(".grade");
+  badge.className = "grade " + (g || "");
+  badge.textContent = g || "?";
+  slot.querySelector(".info").textContent = info || "";
+}
+
+// 입력한 칸을 비교한다. 자동 완성 목록에 없는 이름(입력 중)은 빼고 보낸다.
+async function compare(manual) {
   const out = document.getElementById("cmp-out");
-  const q = new URLSearchParams();
-  for (const input of e.target.querySelectorAll("input")) if (input.value.trim()) q.append("c", input.value.trim());
-  out.innerHTML = `<div class="note">비교 중…</div>`;
+  const q = new URLSearchParams(), sent = [];
+  slots.forEach(slot => {
+    const name = slot.querySelector("input[name=c]").value.trim();
+    const ready = name && (manual || !knownNames.size || knownNames.has(name));
+    if (!ready) { setSlot(slot, null, name ? "입력 중…" : ""); return; }
+    // 리롤한 칸은 이름 끝에 *를 붙여 보낸다 (카드마다 리롤은 한 번)
+    q.append("c", name + (slot.querySelector("input[type=checkbox]").checked ? "*" : ""));
+    sent.push(slot);
+  });
+  if (!sent.length) { out.innerHTML = ""; return; }
+  const seq = ++compareSeq;
+  if (manual) out.innerHTML = `<div class="note">비교 중…</div>`;
   try {
     const res = await (await fetch("/rank?" + q)).json();
+    if (seq !== compareSeq) return;  // 더 최근 입력의 결과가 우선
     if (res.error) { out.innerHTML = `<div class="err">${esc(res.error)}</div>`; return; }
-    out.innerHTML = res.rows.map((a, i) => `<div class="aug ${i === 0 ? "first" : ""}" style="flex-direction:row;text-align:left">
+    for (const a of res.rows) {
+      const unknown = a.stat.startsWith("이름을");
+      setSlot(sent[a.slot], unknown ? null : a.grade, unknown ? "이름을 찾지 못함" : `${a.name} · 점수 ${a.score} · ${a.action}`);
+    }
+    const reroll = res.verdict.startsWith("리롤");
+    out.innerHTML = `<div class="verdict ${reroll ? "reroll" : "pick"}">${reroll ? "🎲 " : "✔ "}${esc(res.verdict)}</div>` +
+      res.rows.map((a, i) => `<div class="aug ${i === 0 ? "first" : ""}" style="flex-direction:row;text-align:left;padding-right:12px">
       <span class="rank">${i + 1}</span>${img(a.icon, a.name)}
-      <div><div class="nm">${esc(a.name)}${i === 0 ? ' <span class="tag" style="color:var(--teal)">추천</span>' : ""}</div>
-      <div class="sc">점수 ${a.score} · ${esc(a.stat)}</div>${tags(a.reasons)}</div></div>`).join("");
+      <div style="flex:1"><div class="nm">${esc(a.name)}</div>
+      <div class="sc">점수 ${a.score} · ${esc(a.stat)}${a.p_better != null ? ` · 리롤 시 1순위보다 좋을 확률 ${Math.round(a.p_better * 100)}%` : ""}</div>${tags(a.reasons)}</div>
+      <span class="act ${esc(a.action.split(" ")[0])}">${esc(a.action)}</span>
+      <span class="grade" style="position:static;width:52px;height:52px;font-size:28px"></span></div>`).join("");
+    // 결과 카드에도 큰 등급 배지
+    out.querySelectorAll(".aug > .grade").forEach((el, i) => {
+      const g = res.rows[i].stat.startsWith("이름을") ? null : res.rows[i].grade;
+      el.className = "grade " + (g || ""); el.textContent = g || "?";
+    });
   } catch (err) {
-    out.innerHTML = `<div class="err">비교하지 못했습니다.</div>`;
+    if (seq === compareSeq) out.innerHTML = `<div class="err">비교하지 못했습니다.</div>`;
   }
+}
+
+function scheduleCompare() {
+  clearTimeout(compareTimer);
+  compareTimer = setTimeout(() => compare(false), 250);
+}
+
+document.getElementById("cmp").addEventListener("submit", e => { e.preventDefault(); compare(true); });
+slots.forEach(slot => {
+  const input = slot.querySelector("input[name=c]"), check = slot.querySelector("input[type=checkbox]");
+  input.addEventListener("input", scheduleCompare);
+  input.addEventListener("change", scheduleCompare);
+  check.addEventListener("change", scheduleCompare);
+  // 리롤: 칸을 비우고 리롤함 표시, 바로 새 이름을 입력할 수 있게 한다
+  slot.querySelector(".rr").addEventListener("click", () => {
+    input.value = ""; check.checked = true; setSlot(slot, null, "새 증강 이름을 입력하세요");
+    input.focus(); scheduleCompare();
+  });
 });
 
+// 주소에 ?c=증강&c=증강*... 가 있으면 입력칸을 채우고 바로 비교한다 (*는 리롤한 칸)
+function prefill() {
+  const given = new URLSearchParams(location.search).getAll("c");
+  if (!given.length) return;
+  const slots = document.querySelectorAll("#cmp .slot");
+  given.slice(0, 3).forEach((c, i) => {
+    slots[i].querySelector("input[name=c]").value = c.replace(/\*$/, "");
+    slots[i].querySelector("input[type=checkbox]").checked = c.endsWith("*");
+  });
+  document.getElementById("cmp").requestSubmit();
+}
+
 poll();
+prefill();
 setInterval(poll, 3000);
 </script>
 </body>

@@ -2,9 +2,10 @@ import json
 import unittest
 from pathlib import Path
 
-from aram_helper import ddragon, history, live, notify
+from aram_helper import ddragon, history, live, notify, screen
 from aram_helper.analysis import (TeamProfile, auto_role, buy_plan, champion_traits, effective_hp,
-                                  effective_resist, recommend_augments, support_power)
+                                  effective_resist, recommend_augments, reroll_advice, augment_grade,
+                                  support_power)
 from aram_helper.augments import classify
 from aram_helper.cli import should_report
 from aram_helper.opgg import item_popularity, parse_response_text
@@ -202,6 +203,98 @@ class SupportAndHistoryTest(unittest.TestCase):
     def test_speech_starts_with_buy_now(self):
         text = notify.speech_text({"items": ["라바돈"], "augments": [], "buy_now": ["증폭의 고서"]})
         self.assertTrue(text.startswith("지금 구매 증폭의 고서"))
+
+
+class RerollTest(unittest.TestCase):
+    @staticmethod
+    def cards(*scores, rerolled=()):
+        return [{"name": f"증강{i + 1}", "score": s, "rerolled": i in rerolled} for i, s in enumerate(scores)]
+
+    def test_strong_best_card_pick(self):
+        # 리롤로 나올 증강이 모두 1순위보다 약하면 그냥 뽑는다
+        pool = [70, 75, 80, 85]
+        advice, verdict = reroll_advice(self.cards(95, 80, 78), [pool] * 3)
+        self.assertEqual(advice[0]["action"], "선택")
+        self.assertEqual(advice[1]["action"], "유지")
+        self.assertTrue(verdict.startswith("그냥 뽑기"))
+
+    def test_weak_cards_reroll_others(self):
+        # 1순위보다 좋은 증강이 나올 확률 50% -> 나머지 칸 리롤
+        pool = [70, 80, 95, 100]
+        advice, verdict = reroll_advice(self.cards(85, 70, 65), [pool] * 3)
+        self.assertEqual(advice[0]["action"], "선택")
+        self.assertEqual([a["action"] for a in advice[1:]], ["리롤", "리롤"])
+        self.assertAlmostEqual(advice[1]["p_better"], 0.5)
+        self.assertTrue(verdict.startswith("리롤 추천"))
+
+    def test_weak_best_card_with_close_second(self):
+        # 1순위 80, 2순위 79: 1순위를 리롤해도 최소 79는 남고 높은 증강을 기대할 수 있다
+        pool = [60, 90, 100, 110]
+        # 나머지 칸을 아직 리롤하지 않았으면 그쪽(손해 없음)을 먼저 한다
+        advice, _ = reroll_advice(self.cards(80, 79, 50), [pool] * 3)
+        self.assertEqual(advice[0]["action"], "선택")
+        # 나머지 칸을 다 리롤한 뒤에는 1순위 리롤이 이득
+        advice, verdict = reroll_advice(self.cards(80, 79, 50, rerolled=(1, 2)), [pool] * 3)
+        self.assertEqual(advice[0]["action"], "리롤")
+        self.assertGreater(advice[0]["gain"], 0)
+        self.assertTrue(verdict.startswith("리롤 추천"))
+
+    def test_already_rerolled_slot(self):
+        advice, verdict = reroll_advice(self.cards(85, 70, 65, rerolled=(1, 2)), [[70, 95]] * 3)
+        self.assertEqual([a["action"] for a in advice[1:]], ["리롤함", "리롤함"])
+        self.assertTrue(verdict.startswith("그냥 뽑기"))
+
+
+class GradeTest(unittest.TestCase):
+    def test_grade_by_rank_in_pool(self):
+        pool = list(range(100))  # 0~99점 100개
+        self.assertEqual(augment_grade(99, pool), "S")   # 위에 0개
+        self.assertEqual(augment_grade(85, pool), "A")   # 위에 14개 (14%)
+        self.assertEqual(augment_grade(50, pool), "B")   # 위에 49개
+        self.assertEqual(augment_grade(20, pool), "C")   # 위에 79개
+        self.assertEqual(augment_grade(5, pool), "D")    # 위에 94개
+        self.assertIsNone(augment_grade(50, []))
+
+
+class ScreenTest(unittest.TestCase):
+    NAMES = ["나는 왕이다", "지옥의 전도체", "최상급 조준경 부착", "궁극기 대변혁", "궁극기 봇", "데굴데굴 눈덩이!"]
+
+    @staticmethod
+    def line(text, x, y):
+        return {"text": text, "x": x, "y": y, "w": 0.1, "h": 0.02}
+
+    def test_match_choices_fixes_ocr_typos_and_ignores_descriptions(self):
+        lines = [self.line("최상급 조준경 부활", 0.65, 0.40),   # 오타
+                 self.line("나는 왕이다", 0.28, 0.40),
+                 self.line("지옥의 전도세", 0.47, 0.40),        # 오타
+                 self.line("궁극기를 사용한 다음 초기화합니다.", 0.45, 0.47),  # 설명 줄
+                 self.line("4", 0.9, 0.03)]
+        self.assertEqual(screen.match_choices(lines, self.NAMES),
+                         ["나는 왕이다", "지옥의 전도체", "최상급 조준경 부착"])
+
+    def test_tracker_marks_single_changed_slot_as_rerolled(self):
+        t = screen.ChoiceTracker()
+        self.assertTrue(t.update(["나는 왕이다", "궁극기 대변혁", "데굴데굴 눈덩이!"]))
+        self.assertFalse(t.update(["나는 왕이다", "궁극기 대변혁", "데굴데굴 눈덩이!"]))
+        self.assertTrue(t.update(["나는 왕이다", "지옥의 전도체", "데굴데굴 눈덩이!"]))
+        self.assertEqual(t.query(), ["나는 왕이다", "지옥의 전도체*", "데굴데굴 눈덩이!"])
+        # 세 칸이 모두 바뀌면 새 선택 화면
+        t.update(["궁극기 봇", "최상급 조준경 부착", "나는 왕이다"])
+        self.assertEqual(t.rerolled, [False, False, False])
+
+    def test_tracker_forgets_after_screen_closes(self):
+        t = screen.ChoiceTracker(forget_after=2)
+        t.update(["나는 왕이다", "궁극기 대변혁", "데굴데굴 눈덩이!"])
+        t.update([])
+        t.update([])
+        self.assertEqual(t.names, [])
+
+    @unittest.skipUnless(screen._powershell(), "Windows OCR 없음")
+    def test_ocr_full_screenshot(self):
+        # 전체 화면 캡처: 기본 영역(증강 카드 부분)만 읽는다
+        lines = screen.ocr(ROOT / "samples" / "image.png")
+        self.assertEqual(screen.match_choices(lines, self.NAMES),
+                         ["나는 왕이다", "지옥의 전도체", "최상급 조준경 부착"])
 
 
 class LiveExtrasTest(unittest.TestCase):

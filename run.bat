@@ -32,8 +32,8 @@ if not "%~1"=="" (
 :menu
 echo.
 echo ===== 칼바람 아이템·증강 추천 =====
-echo  1. 게임 중 자동 분석
-echo  2. 게임 중 자동 분석 + 음성 안내 + 웹페이지 (http://localhost:8765)
+echo  1. 게임 중 자동 분석 (증강 선택 화면 자동 읽기 포함)
+echo  2. 게임 중 자동 분석 + 웹페이지 (http://localhost:8765) + 음성 안내
 echo  3. 샘플 데이터로 미리 보기 (게임 없이 테스트)
 echo  4. 증강 선택지 비교 (게임 중, 선택 화면의 증강 3개 입력)
 echo  5. 게임 기록과 추천을 따랐을 때의 승률
@@ -46,8 +46,8 @@ echo.
 set "SEL="
 set /p SEL=번호 선택:
 
-if "%SEL%"=="1" %PY% -m aram_helper live --watch 2
-if "%SEL%"=="2" %PY% -m aram_helper live --watch 2 --speak --serve 8765
+if "%SEL%"=="1" %PY% -m aram_helper live --watch 2 --screen
+if "%SEL%"=="2" %PY% -m aram_helper live --watch 2 --screen --speak --serve 8765
 if "%SEL%"=="3" %PY% -m aram_helper live --file samples/sample_allgamedata.json
 if "%SEL%"=="4" call :pick
 if "%SEL%"=="5" %PY% -m aram_helper history
@@ -70,7 +70,7 @@ exit /b
 :startup_on
 set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\aram_helper.bat"
 > "%STARTUP%" echo @echo off
->> "%STARTUP%" echo start "aram_helper" /min "%SELF%" live --watch 2 --speak --serve 8765
+>> "%STARTUP%" echo start "aram_helper" /min "%SELF%" live --watch 2 --screen --speak --serve 8765
 echo 등록했습니다. 다음 로그인부터 최소화된 창으로 자동 실행되어 게임을 기다립니다.
 echo (등록 파일: %STARTUP%)
 exit /b

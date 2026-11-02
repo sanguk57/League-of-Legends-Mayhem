@@ -602,3 +602,63 @@ def recommend_augments(augments, role, dmg_type, enemy, ally, me=None, top=6,
         picks.append({**aug, "score": score, "reasons": reasons})
     picks.sort(key=lambda a: a["score"], reverse=True)
     return picks[:top]
+
+
+# 리롤로 1순위보다 좋은 증강이 나올 확률이 이 이상이면 리롤을 추천한다
+REROLL_WORTH = 0.15
+
+
+def reroll_advice(cards, pools):
+    """증강 선택 화면에서 카드별로 리롤할지 정한다.
+
+    cards: 점수 높은 순으로 정렬한 [{"name", "score", "rerolled"}]
+    pools: 카드마다 리롤하면 나올 수 있는 증강 점수 목록 (같은 등급)
+    리롤은 카드마다 한 번이고, 리롤하면 원래 카드는 사라진다.
+    1순위가 아닌 카드는 어차피 고르지 않으므로 리롤해도 손해가 없다.
+    1순위 카드는 리롤하면 2순위와 새 카드 중 하나를 고르게 되므로 그 기댓값과 비교한다.
+    """
+    best = cards[0]["score"]
+    second = cards[1]["score"] if len(cards) > 1 else float("-inf")
+    # 손해 없는 나머지 칸 리롤을 먼저 하고, 1순위 리롤은 그 결과를 보고 정한다
+    others_open = any(not c["rerolled"] and pools[i] for i, c in enumerate(cards) if i > 0)
+    result = []
+    for i, card in enumerate(cards):
+        xs = pools[i]
+        if card["rerolled"] or not xs:
+            result.append({"action": "리롤함" if card["rerolled"] else "정보 없음", "p_better": None})
+            continue
+        p = sum(x > best for x in xs) / len(xs)
+        if i == 0:
+            gain = sum(max(second, x) for x in xs) / len(xs) - best
+            reroll = gain > 0 and not others_open
+            result.append({"action": "리롤" if reroll else "선택", "p_better": p, "gain": gain})
+        else:
+            result.append({"action": "리롤" if p >= REROLL_WORTH else "유지", "p_better": p})
+
+    names = [c["name"] for c, r in zip(cards, result) if r["action"] == "리롤"]
+    if result[0]["action"] == "리롤":
+        keep = f" ({cards[1]['name']}은(는) 남아 있음)" if len(cards) > 1 else ""
+        verdict = (f"리롤 추천: 1순위 {cards[0]['name']}도 리롤하는 편이 기대값이 높습니다{keep}. "
+                   f"리롤 후 다시 비교하세요.")
+    elif names:
+        p = max(r["p_better"] for r in result[1:] if r["action"] == "리롤")
+        verdict = (f"리롤 추천: {', '.join(names)} 리롤 (최대 {p:.0%} 확률로 {cards[0]['name']}보다 좋은 증강). "
+                   f"리롤 후 새 증강으로 다시 비교하세요.")
+    else:
+        rest = [r["p_better"] for r in result[1:] if r["p_better"] is not None]
+        chance = (f" (나머지 칸은 리롤해도 손해는 없지만 더 좋은 증강이 나올 확률 {max(rest):.0%})"
+                  if rest else "")
+        verdict = f"그냥 뽑기: {cards[0]['name']}{chance}"
+    return result, verdict
+
+
+# 증강 등급: 내 챔피언이 받을 수 있는 증강 중 지금 상황 점수가 상위 몇 %인지로 나눈다
+GRADE_CUTS = (("S", 0.10), ("A", 0.30), ("B", 0.60), ("C", 0.85))
+
+
+def augment_grade(score, pool):
+    """pool(같은 기준으로 매긴 증강 점수들) 안에서 score의 등급 S~D."""
+    if not pool:
+        return None
+    above = sum(x > score for x in pool) / len(pool)
+    return next((grade for grade, cut in GRADE_CUTS if above < cut), "D")

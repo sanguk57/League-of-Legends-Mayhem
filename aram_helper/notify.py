@@ -75,7 +75,9 @@ class WebBoard:
         self.dead = False
         self.body = "아직 추천이 없습니다. 죽거나 게임이 시작되면 표시됩니다."
         self.view = None
-        # 증강 비교: ranker(이름 목록) -> 결과 행 목록, augment_names: 입력 자동 완성 목록
+        # 화면에서 읽은 증강 선택지 {"seq", "names", "rerolled", "rows", "verdict"}
+        self.screen = None
+        # 증강 비교: ranker(이름 목록) -> {"rows", "verdict"}, augment_names: 입력 자동 완성 목록
         self.ranker = None
         self.augment_names = []
         board = self
@@ -84,7 +86,8 @@ class WebBoard:
             def do_GET(self):
                 url = urlparse(self.path)
                 if url.path == "/data":
-                    self._send(json.dumps({"status": board.status, "dead": board.dead, "view": board.view},
+                    self._send(json.dumps({"status": board.status, "dead": board.dead, "view": board.view,
+                                           "screen": board.screen},
                                           ensure_ascii=False), "application/json")
                 elif url.path == "/names":
                     self._send(json.dumps(board.augment_names, ensure_ascii=False), "application/json")
@@ -118,7 +121,7 @@ class WebBoard:
         if self.ranker is None:
             return {"error": "아직 게임 데이터가 없습니다. 게임이 시작된 뒤 다시 시도하세요."}
         try:
-            return {"rows": self.ranker(choices)}
+            return self.ranker(choices)
         except Exception as e:  # 웹페이지가 죽지 않도록 오류를 그대로 보여준다
             return {"error": f"비교하지 못했습니다: {e}"}
 

@@ -10,13 +10,14 @@ import argparse
 import json
 import re
 import sys
+import threading
 import time
 
 from . import augments as aug_data
-from . import ddragon, history, live, notify, opgg
+from . import ddragon, history, live, notify, opgg, screen
 from .analysis import (INVENTORY_SLOTS, ROLE_LABEL, Model, augment_mean, auto_damage_type, auto_role, buy_plan,
                        describe_team, recommend_augments, recommend_boots, recommend_items,
-                       recommend_swap)
+                       recommend_swap, reroll_advice, augment_grade)
 from .ddragon import normalize
 from .stats import gold_values, item_stats, stat_gold
 
@@ -112,14 +113,17 @@ def report(ctx, top, gold=None, augment_first=False):
         if not set(core) & {p.item_id for p in picks} - set(me.item_ids):
             out.append("   (현재 역할 기준 추천과 겹치지 않습니다. 다른 빌드를 보려면 --role 또는 --damage를 바꿔 보세요)")
 
-    aug_picks = recommend_augments(ctx["augments"], role, dmg_type, enemy, ally, me, top)
+    aug_pool = augment_pool(ctx)
+    pool_scores = [a["score"] for a in aug_pool]
+    aug_picks = [{**a, "grade": augment_grade(a["score"], pool_scores)} for a in aug_pool[:top]]
     aug_lines = []
     if aug_picks:
-        aug_lines.append("\n[추천 증강] OP.GG 성능 점수(인기 낮으면 평균 쪽으로 보정) + 상황 보정")
+        aug_lines.append("\n[추천 증강] 등급 = 받을 수 있는 증강 중 상위 %(S 10%, A 30%, B 60%, C 85%) / "
+                         "점수 = OP.GG 성능(인기 낮으면 평균 쪽으로 보정) + 상황 보정")
         for n, a in enumerate(aug_picks, 1):
             reasons = f"  - {', '.join(a['reasons'])}" if a["reasons"] else ""
-            aug_lines.append(f" {n}. {a['name']}  점수 {a['score']:.1f} (성능 {a['performance']}, "
-                             f"인기 {a['popular']}, 등급 {a['tier']}){reasons}")
+            aug_lines.append(f" {n}. [{a['grade']}] {a['name']}  점수 {a['score']:.1f} "
+                             f"(성능 {a['performance']}, 인기 {a['popular']}){reasons}")
     elif ctx["use_opgg"]:
         aug_lines.append("\n[추천 증강] OP.GG 증강 데이터 없음")
     if augment_first:
@@ -223,7 +227,7 @@ def _view(ctx, picks, aug_picks, plan, swap, boots, core, enemy, ally, gold, aug
                           "buy": _item_view(gd, swap["buy_id"]), "gain": round(swap["gain"], 1)},
         "items": items,
         "augments": [{"name": a["name"], "icon": icons.get(a.get("id")), "score": round(a["score"], 1),
-                      "tier": a.get("tier"), "reasons": a["reasons"]} for a in aug_picks],
+                      "grade": a["grade"], "reasons": a["reasons"]} for a in aug_picks],
         "boots": boots and boots.get("item_id") and {**_item_view(gd, boots["item_id"]), "reason": boots["reason"]},
         "core": [_item_view(gd, i) for i in core],
         "teams": [
@@ -235,16 +239,26 @@ def _view(ctx, picks, aug_picks, plan, swap, boots, core, enemy, ally, gold, aug
     }
 
 
+def augment_pool(ctx):
+    """내 챔피언이 받을 수 있는 증강 전체를 지금 상황 점수로 매긴 목록 (점수 높은 순, 보유 증강 제외)."""
+    model = ctx["model"]
+    return recommend_augments(ctx["augments"], ctx["role"], ctx["dmg_type"], model.enemy, model.ally,
+                              ctx["me"], top=len(ctx["augments"]))
+
+
 def rank_choices(ctx, names):
-    """증강 선택 화면에 나온 증강들의 순위. OP.GG 통계가 없는 증강은 평균 성능으로 본다."""
+    """증강 선택 화면에 나온 증강들의 순위와 리롤 여부. OP.GG 통계가 없는 증강은 평균 성능으로 본다.
+    이름 끝에 *를 붙이면 이미 리롤한 칸으로 본다 (카드마다 리롤은 한 번)."""
     by_name = {normalize(a["name"]): a for a in ctx["augments"] if a.get("name")}
     try:
         catalog = aug_data.load_catalog()
         catalog.add_descriptions(ctx["augments"])
     except OSError:
         catalog = None
+    rerolled = {normalize(n.rstrip("*")) for n in names if n.strip().endswith("*")}
+    names = [n.strip().rstrip("*").strip() for n in names]
     cands, missing, unknown = [], [], []
-    for name in names:
+    for slot, name in enumerate(names):
         aug = by_name.get(normalize(name))
         if aug is None:
             found = {"name": name, "desc": ""}
@@ -255,13 +269,27 @@ def rank_choices(ctx, names):
             aug = {"id": found.get("id"), "name": found["name"], "desc": found.get("desc", ""),
                    "performance": 0, "popular": 0, "tier": "-"}
             missing.append(aug["name"])
-        cands.append(aug)
+        # 입력한 칸 번호 (웹페이지가 칸마다 등급을 붙일 때 쓴다)
+        cands.append({**aug, "slot": slot})
     enemy, ally = ctx["model"].enemy, ctx["model"].ally
     picks = recommend_augments(cands, ctx["role"], ctx["dmg_type"], enemy, ally, ctx["me"],
                                top=len(cands), min_popular=0, mean=augment_mean(ctx["augments"]))
+    # 리롤하면 나올 수 있는 증강: 내 챔피언의 OP.GG 증강 중 같은 희귀도, 지금 화면에 없는 것
+    pool = augment_pool(ctx)
+    pool_scores = [p["score"] for p in pool]
+    rarity = (lambda a: catalog.by_id.get(a.get("id"), {}).get("rarity")) if catalog else (lambda a: None)
+    shown = {normalize(a["name"]) for a in picks}
+    pools = []
+    for a in picks:
+        same = [p["score"] for p in pool if normalize(p["name"]) not in shown and rarity(p) == rarity(a)]
+        # 등급 정보가 없거나 후보가 너무 적으면 전체에서 고른다고 본다
+        pools.append(same if len(same) >= 5 else [p["score"] for p in pool if normalize(p["name"]) not in shown])
+    cards = [{"name": a["name"], "score": a["score"], "rerolled": normalize(a["name"]) in rerolled} for a in picks]
+    advice, verdict = reroll_advice(cards, pools)
+
     out = [f"{ctx['me'].champion['name']} ({ROLE_LABEL[ctx['role']]}) 기준 증강 순위"]
     rows = []
-    for n, a in enumerate(picks, 1):
+    for n, (a, adv) in enumerate(zip(picks, advice), 1):
         if a["name"] in unknown:
             stat = "이름을 찾지 못함, 평균으로 계산"
         elif a["name"] in missing:
@@ -269,11 +297,15 @@ def rank_choices(ctx, names):
         else:
             stat = f"성능 {a['performance']}"
         reasons = f"  - {', '.join(a['reasons'])}" if a["reasons"] else ""
-        out.append(f" {n}. {a['name']}  점수 {a['score']:.1f} ({stat}){reasons}")
+        chance = f", 리롤 시 1순위보다 좋을 확률 {adv['p_better']:.0%}" if adv["p_better"] is not None else ""
+        grade = augment_grade(a["score"], pool_scores)
+        out.append(f" {n}. [{grade}등급 · {adv['action']}] {a['name']}  점수 {a['score']:.1f} ({stat}{chance}){reasons}")
         icon = catalog.by_id.get(a.get("id"), {}).get("icon") if catalog else None
-        rows.append({"name": a["name"], "icon": icon, "score": round(a["score"], 1), "stat": stat,
-                     "reasons": a["reasons"]})
-    return "\n".join(out), rows
+        rows.append({"name": a["name"], "slot": a["slot"], "icon": icon, "score": round(a["score"], 1),
+                     "grade": grade, "stat": stat, "reasons": a["reasons"], "action": adv["action"],
+                     "p_better": adv["p_better"]})
+    out.append(f"\n→ {verdict}")
+    return "\n".join(out), {"rows": rows, "verdict": verdict}
 
 
 def augment_names(ctx):
@@ -322,6 +354,42 @@ def team_lines(gd, allies, enemies):
     return lines
 
 
+def start_screen_reader(args, gd, latest, board, use_opgg):
+    """증강 선택 화면을 읽는 백그라운드 스레드. 반환한 dict의 active가 True일 때만 읽는다."""
+    state = {"active": False, "seq": 0}
+    tracker = screen.ChoiceTracker()
+    names = []
+
+    def loop():
+        warned = False
+        while True:
+            if not state["active"] or "units" not in latest:
+                time.sleep(0.5)
+                continue
+            try:
+                if not names:
+                    names.extend(augment_names({"augments": []}))
+                lines = screen.ocr(args.screen_image, monitor=args.screen_monitor)
+            except screen.OcrError as e:
+                if not warned:
+                    print(f"[경고] {e}", file=sys.stderr)
+                    warned = True
+                time.sleep(5)
+                continue
+            if tracker.update(screen.match_choices(lines, names)):
+                ctx = context(gd, *latest["units"], args.role, args.damage, use_opgg)
+                text, result = rank_choices(ctx, tracker.query())
+                state["seq"] += 1
+                print(f"\n[화면에서 읽은 증강 선택지] {' / '.join(tracker.query())}\n{text}")
+                if board:
+                    board.screen = {"seq": state["seq"], "names": tracker.names,
+                                    "rerolled": tracker.rerolled, **result}
+            time.sleep(1)
+
+    threading.Thread(target=loop, daemon=True).start()
+    return state
+
+
 def cmd_live(args):
     gd = ddragon.load()
     use_opgg = not args.no_opgg
@@ -340,8 +408,11 @@ def cmd_live(args):
 
     if board:
         board.ranker = ranker
+    reader = start_screen_reader(args, gd, latest, board, use_opgg) if args.screen else None
 
     while True:
+        if reader:
+            reader["active"] = False
         try:
             data = read_game(args)
             me, allies, enemies, info = live.parse_game(gd, data)
@@ -362,6 +433,9 @@ def cmd_live(args):
             continue
         waiting = False
         latest["units"] = (me, allies, enemies)
+        if reader:
+            # 증강은 죽어서 우물에 있을 때(첫 증강은 게임 시작 직후)만 고를 수 있으므로 그때만 화면을 읽는다
+            reader["active"] = info["dead"] or info["time"] < START_SHOPPING_SECONDS
 
         # 새 게임: 처음 연결했거나, 챔피언이 바뀌었거나, 게임 시간이 되돌아갔을 때
         if (game is None or game["champion"] != me.champion["id"]
@@ -496,6 +570,10 @@ def main(argv=None):
     lv.add_argument("--augment-levels", default=",".join(map(str, AUGMENT_LEVELS)),
                     help="증강을 고르는 레벨 (기본: 3,7,11,15)")
     lv.add_argument("--no-history", action="store_true", help="게임 기록을 저장하지 않음")
+    lv.add_argument("--screen", action="store_true",
+                    help="증강 선택 화면을 읽어 선택지를 자동으로 비교 (Windows OCR, 테두리 없는 창 모드 권장)")
+    lv.add_argument("--screen-monitor", type=int, default=-1, help="읽을 모니터 번호 (기본: 주 모니터)")
+    lv.add_argument("--screen-image", help="화면 대신 이 이미지를 읽음 (테스트용)")
     lv.set_defaults(func=cmd_live)
 
     pk = sub.add_parser("pick", help="증강 선택지 비교 (예: pick 둠 핀볼 \"남작의 도움\")")
