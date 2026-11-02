@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>칼바람 추천</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0a0e13;
+    --panel: #121a23;
+    --panel-2: #172230;
+    --line: #223041;
+    --text: #e8ecf1;
+    --muted: #8b98a8;
+    --gold: #c8aa6e;
+    --gold-hi: #f0d898;
+    --teal: #0ac8b9;
+    --red: #e84057;
+    --green: #3ccf8e;
+    --phys: #e8743b;
+    --magic: #4f8ff7;
+    --true: #e8ecf1;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Pretendard", "Malgun Gothic", system-ui, -apple-system, sans-serif;
+    font-size: 15px; line-height: 1.45;
+    background-image: radial-gradient(1200px 500px at 50% -200px, #1b2a3d 0%, transparent 70%);
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 16px; }
+  img { display: block; }
+
+  /* 상단 */
+  .top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+  .portrait { width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--gold);
+              box-shadow: 0 0 0 3px #0a0e13, 0 0 18px #c8aa6e55; background: var(--panel); object-fit: cover; }
+  .who { flex: 1; min-width: 160px; }
+  .who h1 { margin: 0; font-size: 22px; letter-spacing: -0.3px; }
+  .who .sub { color: var(--muted); font-size: 14px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+          background: var(--panel); border: 1px solid var(--line); font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .pill.dead { background: #3a1520; border-color: #e8405788; color: #ffb3bf; }
+  .pill.alive { color: #9ff0c9; }
+  .pill.gold { color: var(--gold-hi); border-color: #c8aa6e66; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .pill.dead .dot { animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+
+  /* 배치 */
+  .grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 900px) { .grid { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); } }
+  .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; overflow-wrap: anywhere; }
+  .card h2 { margin: 0 0 12px; font-size: 13px; letter-spacing: 1.5px; color: var(--muted); font-weight: 700;
+             text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .card h2 { flex-wrap: wrap; }
+  .card h2 .hint { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; }
+
+  /* 지금 살 것 */
+  .hero { background: linear-gradient(160deg, #1c2a1f00, #c8aa6e14), var(--panel-2);
+          border: 1px solid #c8aa6e66; box-shadow: 0 0 0 1px #c8aa6e22 inset, 0 10px 40px #00000066; }
+  .hero h2 { color: var(--gold-hi); }
+  .buyrow { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .tile { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 104px; text-align: center; }
+  .tile .icon { position: relative; }
+  .tile img, .tile .ph { width: 88px; height: 88px; border-radius: 10px; border: 2px solid var(--gold);
+                         box-shadow: 0 0 22px #c8aa6e55; background: #0d1319; }
+  .tile .name { margin-top: 8px; font-weight: 700; font-size: 15px; line-height: 1.25; word-break: keep-all; }
+  .tile .cost { color: var(--gold-hi); font-size: 13px; font-weight: 600; }
+  .tile.target img, .tile.target .ph { opacity: .55; border-style: dashed; box-shadow: none; }
+  .tile.target .name { color: var(--muted); }
+  .tile.done img { border-color: var(--green); box-shadow: 0 0 26px #3ccf8e66; }
+  .badge { position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); padding: 2px 8px;
+           border-radius: 999px; font-size: 11px; font-weight: 800; background: var(--gold); color: #1a1408; white-space: nowrap; }
+  .badge.green { background: var(--green); color: #06251a; }
+  .badge.red { background: var(--red); color: white; }
+  .arrow { font-size: 28px; color: var(--gold); margin-top: -28px; }
+  .note { margin-top: 14px; color: var(--muted); font-size: 14px; }
+  .note b { color: var(--text); }
+  .swap { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line); }
+  .swap .tile.sell img { border-color: var(--red); box-shadow: 0 0 18px #e8405744; filter: grayscale(.4); }
+
+  /* 증강 */
+  .aug-banner { display: flex; align-items: center; gap: 10px; padding: 12px 14px; margin-bottom: 14px; border-radius: 10px;
+                background: linear-gradient(90deg, #0ac8b933, #0ac8b908); border: 1px solid #0ac8b977; color: #b8fff8; font-weight: 700; }
+  .aug-banner .dot { color: var(--teal); animation: blink 1s infinite; }
+  .augs-top { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 560px) { .augs-top { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .aug { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 12px; background: var(--panel-2);
+         border: 1px solid var(--line); position: relative; }
+  @media (min-width: 560px) { .augs-top .aug { flex-direction: column; text-align: center; } }
+  .aug img, .aug .ph { width: 72px; height: 72px; border-radius: 12px; flex: none; background: #0d1319; }
+  .aug.first { border-color: var(--teal); box-shadow: 0 0 24px #0ac8b933; }
+  .aug .rank { position: absolute; top: 8px; left: 10px; font-weight: 800; color: var(--teal); font-size: 13px; }
+  .aug > div { min-width: 0; }
+  .aug .nm { font-size: 17px; font-weight: 800; word-break: keep-all; }
+  .aug .sc { color: var(--muted); font-size: 13px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  @media (min-width: 560px) { .augs-top .tags { justify-content: center; } }
+  .tag { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #ffffff0d; border: 1px solid #ffffff14; color: #c9d3de; }
+  .augs-more { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .aug-s { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
+  .aug-s img, .aug-s .ph { width: 32px; height: 32px; border-radius: 8px; flex: none; }
+  .aug-s b { color: var(--text); font-weight: 600; }
+
+  /* 추천 아이템 목록 */
+  .items { display: flex; flex-direction: column; gap: 8px; }
+  .item { display: grid; grid-template-columns: 22px 52px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px;
+          border-radius: 12px; background: var(--panel-2); border: 1px solid transparent; }
+  .item:first-child { border-color: #c8aa6e55; }
+  .item .no { color: var(--muted); font-weight: 800; text-align: center; }
+  .item:first-child .no { color: var(--gold-hi); }
+  .item img, .item .ph { width: 52px; height: 52px; border-radius: 8px; border: 1px solid #c8aa6e66; background: #0d1319; }
+  .item .line1 { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .item .nm { font-weight: 700; font-size: 16px; }
+  .item .g { color: var(--gold-hi); font-size: 13px; }
+  .bar { height: 6px; border-radius: 3px; background: #ffffff10; margin-top: 6px; overflow: hidden; }
+  .bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-hi)); border-radius: 3px; }
+  .item .sc { color: var(--muted); font-size: 12px; margin-left: auto; }
+  .small-row { display: flex; align-items: center; gap: 10px; }
+  .small-row img, .small-row .ph { width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--line); }
+  .core { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+  .core img, .core .ph { width: 30px; height: 30px; border-radius: 6px; }
+
+  /* 팀 */
+  .mix { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin: 4px 0 6px; background: #ffffff10; }
+  .mix .p { background: var(--phys); } .mix .m { background: var(--magic); } .mix .t { background: var(--true); }
+  .legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
+  .unit { display: grid; grid-template-columns: 40px 1fr; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid #ffffff08; }
+  .unit:first-of-type { border-top: 0; }
+  .unit img.ch, .unit .ph.ch { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); }
+  .unit.me img.ch { border-color: var(--gold); }
+  .unit .nm { font-weight: 600; font-size: 14px; }
+  .unit .nm small { color: var(--muted); font-weight: 500; margin-left: 4px; }
+  .unit .its { display: flex; gap: 3px; margin-top: 3px; flex-wrap: wrap; }
+  .unit .its img, .unit .its .ph { width: 24px; height: 24px; border-radius: 4px; }
+  .facts { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #c9d3de; }
+  .facts li::before { content: "•"; color: var(--gold); margin-right: 6px; }
+
+  /* 증강 비교 */
+  .cmp { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 560px) { .cmp { grid-template-columns: 1fr 1fr 1fr auto; } }
+  .cmp input { width: 100%; padding: 11px 12px; font-size: 15px; border-radius: 10px; border: 1px solid var(--line);
+               background: #0d1319; color: var(--text); }
+  .cmp input:focus { outline: 2px solid #0ac8b977; border-color: transparent; }
+  .cmp button { padding: 11px 18px; font-size: 15px; font-weight: 700; border: 0; border-radius: 10px; cursor: pointer;
+                background: var(--teal); color: #032a27; }
+  .cmp-out { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .err { color: #ffb3bf; font-size: 14px; }
+
+  .empty { text-align: center; padding: 60px 16px; color: var(--muted); }
+  .empty .big { font-size: 20px; color: var(--text); font-weight: 700; margin-bottom: 6px; }
+  .ph { display: flex; align-items: center; justify-content: center; color: var(--muted); font-weight: 700; background: #0d1319; }
+  footer { text-align: center; color: #5c6876; font-size: 12px; margin: 22px 0 6px; }
+  .conn-bad { color: var(--red); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top" id="top"></div>
+  <div id="main"></div>
+
+  <div class="card" style="margin-top:16px">
+    <h2>증강 선택지 비교 <span class="hint">선택 화면에 나온 증강 3개를 입력</span></h2>
+    <form class="cmp" id="cmp">
+      <input name="c" list="augnames" placeholder="첫 번째 증강" autocomplete="off">
+      <input name="c" list="augnames" placeholder="두 번째 증강" autocomplete="off">
+      <input name="c" list="augnames" placeholder="세 번째 증강" autocomplete="off">
+      <button type="submit">비교</button>
+    </form>
+    <datalist id="augnames"></datalist>
+    <div class="cmp-out" id="cmp-out"></div>
+  </div>
+
+  <footer id="foot">연결 중…</footer>
+</div>
+
+<script>
+const DD = "https://ddragon.leagueoflegends.com/cdn/";
+let version = "", lastText = "", namesLoaded = false;
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const won = n => (n == null ? "-" : Math.round(n).toLocaleString("ko-KR")) + "g";
+
+// 이미지가 없으면 이름 첫 글자로 대신한다
+function img(src, name, cls = "") {
+  const ph = `<div class="ph ${cls}" style="display:none">${esc((name || "?").slice(0, 1))}</div>`;
+  if (!src) return ph.replace('style="display:none"', "");
+  return `<img class="${cls}" src="${esc(src)}" alt="${esc(name)}" loading="lazy"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${ph}`;
+}
+const itemImg = (id, name, cls) => img(`${DD}${version}/img/item/${id}.png`, name, cls);
+const champImg = (id, name, cls) => img(`${DD}${version}/img/champion/${id}.png`, name, cls);
+const tags = list => list && list.length ? `<div class="tags">${list.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>` : "";
+
+function tile(it, opts = {}) {
+  const badge = opts.badge ? `<span class="badge ${opts.badgeCls || ""}">${esc(opts.badge)}</span>` : "";
+  return `<div class="tile ${opts.cls || ""}">
+    <div class="icon">${itemImg(it.id, it.name)}${badge}</div>
+    <div class="name">${esc(it.name)}</div>
+    <div class="cost">${esc(opts.cost ?? won(it.gold))}</div></div>`;
+}
+
+function renderTop(d) {
+  const v = d.view, me = v && v.me;
+  const state = d.dead ? `<span class="pill dead"><span class="dot"></span>${esc(d.status.split(" / ").pop())}</span>`
+                       : `<span class="pill alive"><span class="dot"></span>${esc(v ? d.status.split(" / ").pop() : d.status)}</span>`;
+  const time = v && v.time ? `<span class="pill">⏱ ${esc(v.time)}</span>` : "";
+  const gold = v && v.gold != null ? `<span class="pill gold">◉ ${won(v.gold)}</span>` : "";
+  document.getElementById("top").innerHTML = me ? `
+    ${champImg(me.id, me.name, "portrait")}
+    <div class="who"><h1>${esc(me.name)}</h1>
+      <div class="sub">레벨 ${me.level} · ${esc(me.role)} · ${esc(me.dmg)} 피해${v.champ_wr ? ` · OP.GG 승률 ${(v.champ_wr * 100).toFixed(1)}%` : ""}</div></div>
+    <div class="chips">${state}${time}${gold}</div>`
+    : `<div class="who"><h1>칼바람 아이템·증강 추천</h1></div><div class="chips">${state}</div>`;
+}
+
+function renderBuy(v) {
+  const b = v.buy;
+  let body = "";
+  if (!b) {
+    body = `<div class="note">보유 골드 정보가 없어 1순위 추천 아이템을 보여줍니다.</div>
+            <div class="buyrow" style="margin-top:12px">${v.items[0] ? tile(v.items[0]) : ""}</div>`;
+  } else if (b.full) {
+    body = `<div class="note"><b>칸이 가득 찼습니다.</b> 아래 교체 추천을 참고하세요.</div>`;
+  } else if (b.complete) {
+    body = `<div class="buyrow">${tile(b.target, {cls: "done", badge: "완성", badgeCls: "green"})}</div>
+            <div class="note"><b>${esc(b.target.name)}</b> 완성 비용 ${won(b.target.gold)} · 남는 골드 ${won(b.left)}</div>`;
+  } else if (b.items.length) {
+    body = `<div class="buyrow">${b.items.map((it, i) => tile(it, {badge: i === 0 ? "지금 구매" : ""})).join("")}
+              <div class="arrow">→</div>${tile(b.target, {cls: "target", cost: `${won(b.remaining)} 남음`, badge: "목표"})}</div>
+            <div class="note">목표 <b>${esc(b.target.name)}</b>까지 ${won(b.remaining)} 남음 · 구매 후 남는 골드 ${won(b.left)}</div>`;
+  } else {
+    body = `<div class="buyrow">${tile(b.target, {cls: "target", cost: `${won(b.target.gold)} 필요`, badge: "목표"})}</div>
+            <div class="note">골드가 모자랍니다. 다음에 <b>${esc(b.target.name)}</b>을(를) 향해 모으세요.</div>`;
+  }
+  if (v.swap) {
+    body += `<div class="swap"><h2 style="margin-bottom:10px">교체 추천 <span class="hint">예상 이득 ${v.swap.gain > 0 ? "+" : ""}${v.swap.gain}점</span></h2>
+      <div class="buyrow">${tile(v.swap.sell, {cls: "sell", badge: "판매", badgeCls: "red", cost: `+${won(v.swap.sell.gold)}`})}
+      <div class="arrow">→</div>${tile(v.swap.buy, {badge: "구매"})}</div></div>`;
+  }
+  const sold = b && b.sold ? ` + 판매 ${won(b.sold)}` : "";
+  return `<div class="card hero"><h2>지금 살 것 <span class="hint">${v.gold != null ? `보유 ${won(v.gold)}${sold}` : ""}</span></h2>${body}</div>`;
+}
+
+function renderAugments(v) {
+  if (!v.augments.length) return "";
+  const top = v.augments.slice(0, 3), more = v.augments.slice(3);
+  const banner = v.augment_first ? `<div class="aug-banner"><span class="dot"></span>증강 선택 가능! 상점에서 증강을 고르세요</div>` : "";
+  return `<div class="card ${v.augment_first ? "hero" : ""}"><h2>추천 증강 <span class="hint">OP.GG 성능 + 상황 보정</span></h2>${banner}
+    <div class="augs-top">${top.map((a, i) => `<div class="aug ${i === 0 ? "first" : ""}"><span class="rank">${i + 1}</span>
+      ${img(a.icon, a.name)}<div><div class="nm">${esc(a.name)}</div><div class="sc">점수 ${a.score}${a.tier && a.tier !== "-" ? ` · ${a.tier}등급` : ""}</div>${tags(a.reasons)}</div></div>`).join("")}</div>
+    ${more.length ? `<div class="augs-more">${more.map((a, i) => `<div class="aug-s">${img(a.icon, a.name)}<span>${i + 4}. <b>${esc(a.name)}</b> · ${a.score}</span></div>`).join("")}</div>` : ""}
+  </div>`;
+}
+
+function renderItems(v) {
+  const max = Math.max(...v.items.map(i => i.score), 1);
+  const boots = v.boots ? `<div class="small-row" style="margin-bottom:12px">${itemImg(v.boots.id, v.boots.name)}
+      <div><div><b>신발: ${esc(v.boots.name)}</b></div><div class="sc" style="color:var(--muted);font-size:13px">${esc(v.boots.reason)}</div></div></div>` : "";
+  const core = v.core.length ? `<div class="core" style="margin-top:12px">OP.GG 코어 ${v.core.map(c => itemImg(c.id, c.name)).join("")}</div>` : "";
+  return `<div class="card"><h2>추천 아이템 <span class="hint">1000골드당 효율 + 상황·OP.GG 보정</span></h2>${boots}
+    <div class="items">${v.items.map((it, i) => `<div class="item"><div class="no">${i + 1}</div>${itemImg(it.id, it.name)}
+      <div style="min-width:0"><div class="line1"><span class="nm">${esc(it.name)}</span><span class="g">${won(it.gold)}</span>
+        <span class="sc">점수 ${it.score}</span></div>
+        <div class="bar"><span style="width:${Math.max(4, it.score / max * 100)}%"></span></div>${tags(it.reasons)}</div></div>`).join("")}</div>
+    ${core}</div>`;
+}
+
+function renderTeam(t, meId) {
+  const [p, m, tr] = t.mix.map(x => (x * 100).toFixed(0));
+  return `<div class="card"><h2>${esc(t.label)} 팀</h2>
+    <div class="mix"><span class="p" style="width:${p}%"></span><span class="m" style="width:${m}%"></span><span class="t" style="width:${tr}%"></span></div>
+    <div class="legend"><span><i style="background:var(--phys)"></i>물리 ${p}%</span><span><i style="background:var(--magic)"></i>마법 ${m}%</span><span><i style="background:var(--true)"></i>고정 ${tr}%</span></div>
+    ${t.units.map((u, i) => `<div class="unit ${t.label === "아군" && i === 0 ? "me" : ""}">${champImg(u.id, u.name, "ch")}
+      <div><div class="nm">${esc(u.name)}<small>Lv${u.level} · ${esc(u.kda)}</small></div>
+      <div class="its">${u.items.map(id => itemImg(id, "")).join("")}</div></div></div>`).join("")}
+    <ul class="facts">${t.lines.slice(2).map(l => `<li>${esc(l.replace(/^(상대|아군) /, ""))}</li>`).join("")}</ul></div>`;
+}
+
+function render(d) {
+  const v = d.view;
+  if (v) version = v.version;
+  renderTop(d);
+  const main = document.getElementById("main");
+  if (!v) {
+    main.innerHTML = `<div class="card empty"><div class="big">${esc(d.status)}</div>죽거나 게임이 시작되면 추천이 여기에 표시됩니다.</div>`;
+    return;
+  }
+  const left = v.augment_first ? renderAugments(v) + renderBuy(v) + renderItems(v)
+                               : renderBuy(v) + renderAugments(v) + renderItems(v);
+  main.innerHTML = `<div class="grid"><div class="col">${left}</div>
+    <div class="col">${v.teams.map(t => renderTeam(t)).join("")}</div></div>`;
+}
+
+async function poll() {
+  const foot = document.getElementById("foot");
+  try {
+    const r = await fetch("/data", {cache: "no-store"});
+    const text = await r.text();
+    if (text !== lastText) { lastText = text; render(JSON.parse(text)); }
+    foot.className = "";
+    foot.textContent = `${version ? `패치 ${version} · ` : ""}3초마다 자동 갱신 · 마지막 확인 ${new Date().toLocaleTimeString("ko-KR")}`;
+    if (!namesLoaded) loadNames();
+  } catch (e) {
+    foot.className = "conn-bad";
+    foot.textContent = "프로그램과 연결이 끊겼습니다. run.bat이 실행 중인지 확인하세요.";
+  }
+}
+
+async function loadNames() {
+  try {
+    const names = await (await fetch("/names")).json();
+    if (!names.length) return;
+    document.getElementById("augnames").innerHTML = names.map(n => `<option value="${esc(n)}">`).join("");
+    namesLoaded = true;
+  } catch (e) {}
+}
+
+document.getElementById("cmp").addEventListener("submit", async e => {
+  e.preventDefault();
+  const out = document.getElementById("cmp-out");
+  const q = new URLSearchParams();
+  for (const input of e.target.querySelectorAll("input")) if (input.value.trim()) q.append("c", input.value.trim());
+  out.innerHTML = `<div class="note">비교 중…</div>`;
+  try {
+    const res = await (await fetch("/rank?" + q)).json();
+    if (res.error) { out.innerHTML = `<div class="err">${esc(res.error)}</div>`; return; }
+    out.innerHTML = res.rows.map((a, i) => `<div class="aug ${i === 0 ? "first" : ""}" style="flex-direction:row;text-align:left">
+      <span class="rank">${i + 1}</span>${img(a.icon, a.name)}
+      <div><div class="nm">${esc(a.name)}${i === 0 ? ' <span class="tag" style="color:var(--teal)">추천</span>' : ""}</div>
+      <div class="sc">점수 ${a.score} · ${esc(a.stat)}</div>${tags(a.reasons)}</div></div>`).join("");
+  } catch (err) {
+    out.innerHTML = `<div class="err">비교하지 못했습니다.</div>`;
+  }
+});
+
+poll();
+setInterval(poll, 3000);
+</script>
+</body>
+</html>

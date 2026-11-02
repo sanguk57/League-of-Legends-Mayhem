@@ -4,13 +4,15 @@
 """
 
 import base64
-import html
+import json
 import shutil
 import socket
 import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 # Windows 음성 합성(System.Speech). 한국어 음성이 있으면 그것을 쓴다.
 _SPEAK_SCRIPT = (
@@ -42,6 +44,10 @@ def speak(text, rate=1):
 
 def speech_text(summary, items=2, augments=2):
     parts = []
+    if summary.get("buy_now"):
+        parts.append("지금 구매 " + ", ".join(summary["buy_now"]))
+    if summary.get("swap"):
+        parts.append(summary["swap"])
     if summary.get("boots"):
         parts.append(f"신발 {summary['boots']}")
     if summary["items"]:
@@ -51,43 +57,51 @@ def speech_text(summary, items=2, augments=2):
     return ". ".join(parts) + "." if parts else "추천할 아이템이 없습니다."
 
 
-_PAGE = """<!doctype html>
-<html lang="ko"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="3">
-<title>칼바람 추천</title>
-<style>
-  :root {{ color-scheme: dark; }}
-  body {{ margin: 0; padding: 16px; background: #111418; color: #e6e6e6;
-         font-family: system-ui, "Malgun Gothic", sans-serif; }}
-  h1 {{ font-size: 18px; margin: 0 0 4px; }}
-  .status {{ color: #9aa4ad; font-size: 14px; margin-bottom: 12px; }}
-  .dead {{ color: #ff7b72; }}
-  pre {{ white-space: pre-wrap; word-break: break-all; font-size: 14px; line-height: 1.5;
-        background: #1a1f25; padding: 12px; border-radius: 8px; }}
-</style></head>
-<body><h1>칼바람 아이템·증강 추천</h1>
-<div class="status {status_class}">{status}</div>
-<pre>{body}</pre></body></html>"""
+# 추천 웹페이지: web/index.html이 /data(JSON)를 3초마다 받아 화면을 다시 그린다
+_INDEX = Path(__file__).with_name("web") / "index.html"
 
 
 class WebBoard:
-    """최신 추천을 보여주는 웹페이지 (3초마다 자동 새로고침)."""
+    """최신 추천을 보여주는 웹페이지.
+
+    /       페이지 (web/index.html)
+    /data   상태와 추천 결과 JSON
+    /names  증강 이름 목록 (입력 자동 완성)
+    /rank   ?c=증강&c=증강&c=증강 선택지 비교 결과 JSON
+    """
 
     def __init__(self, port):
         self.status = "게임을 기다리는 중"
         self.dead = False
         self.body = "아직 추천이 없습니다. 죽거나 게임이 시작되면 표시됩니다."
+        self.view = None
+        # 증강 비교: ranker(이름 목록) -> 결과 행 목록, augment_names: 입력 자동 완성 목록
+        self.ranker = None
+        self.augment_names = []
         board = self
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
-                page = _PAGE.format(status=html.escape(board.status), body=html.escape(board.body),
-                                    status_class="dead" if board.dead else "")
-                data = page.encode("utf-8")
+                url = urlparse(self.path)
+                if url.path == "/data":
+                    self._send(json.dumps({"status": board.status, "dead": board.dead, "view": board.view},
+                                          ensure_ascii=False), "application/json")
+                elif url.path == "/names":
+                    self._send(json.dumps(board.augment_names, ensure_ascii=False), "application/json")
+                elif url.path == "/rank":
+                    result = board.rank(parse_qs(url.query).get("c", []))
+                    self._send(json.dumps(result, ensure_ascii=False), "application/json")
+                elif url.path in ("/", "/index.html"):
+                    self._send(_INDEX.read_text("utf-8"), "text/html")
+                else:
+                    self.send_error(404)
+
+            def _send(self, text, content_type):
+                data = text.encode("utf-8")
                 self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Type", f"{content_type}; charset=utf-8")
                 self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(data)
 
@@ -97,11 +111,24 @@ class WebBoard:
         self.server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
-    def update(self, status, body=None, dead=False):
+    def rank(self, choices):
+        choices = [c.strip() for c in choices if c.strip()][:3]
+        if not choices:
+            return {"error": "증강 선택 화면에 나온 증강 이름을 입력하세요."}
+        if self.ranker is None:
+            return {"error": "아직 게임 데이터가 없습니다. 게임이 시작된 뒤 다시 시도하세요."}
+        try:
+            return {"rows": self.ranker(choices)}
+        except Exception as e:  # 웹페이지가 죽지 않도록 오류를 그대로 보여준다
+            return {"error": f"비교하지 못했습니다: {e}"}
+
+    def update(self, status, body=None, dead=False, view=None):
         self.status = status
         self.dead = dead
         if body is not None:
             self.body = body
+        if view is not None:
+            self.view = view
 
     def urls(self):
         port = self.server.server_address[1]

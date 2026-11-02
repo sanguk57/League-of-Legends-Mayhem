@@ -2,9 +2,9 @@ import json
 import unittest
 from pathlib import Path
 
-from aram_helper import ddragon, live
-from aram_helper.analysis import (TeamProfile, champion_traits, effective_hp, effective_resist,
-                                  recommend_augments)
+from aram_helper import ddragon, history, live, notify
+from aram_helper.analysis import (TeamProfile, auto_role, buy_plan, champion_traits, effective_hp,
+                                  effective_resist, recommend_augments, support_power)
 from aram_helper.augments import classify
 from aram_helper.cli import should_report
 from aram_helper.opgg import item_popularity, parse_response_text
@@ -130,6 +130,10 @@ class LiveParseTest(unittest.TestCase):
         self.assertTrue(info["dead"])
         # 실제 스탯(증강 등 포함)이 계산값 대신 쓰인다
         self.assertAlmostEqual(me.stats()["hp"], 1650.0)
+        self.assertEqual(info["gold"], 1300.0)
+        ashe = next(u for u in enemies if u.champion["id"] == "Ashe")
+        self.assertEqual(ashe.killed_me, 2)
+        self.assertEqual(ashe.kills, 9)
 
     def test_champion_traits_from_spell_text(self):
         gd = _cached_game_data()
@@ -137,6 +141,80 @@ class LiveParseTest(unittest.TestCase):
         self.assertGreaterEqual(champion_traits(gd, gd.champions["Lulu"]).get("shield", 0), 1)
         self.assertGreaterEqual(champion_traits(gd, gd.champions["Vayne"]).get("true_dmg", 0), 1)
         self.assertEqual(champion_traits(gd, gd.champions["Jinx"]).get("heal", 0), 0)
+
+
+class _FakeGameData:
+    """buy_plan용: 아이템 트리만 있는 게임 데이터."""
+
+    def __init__(self, items):
+        self.items = {iid: {"name": iid, "from": frm, "gold": {"base": base}}
+                      for iid, (base, frm) in items.items()}
+
+
+class BuyPlanTest(unittest.TestCase):
+    # T(조합 800) = A + B, A(조합 300) = a + a, B(조합 500) = a, a = 400
+    # 전체 비용: A 1100, B 900, T 2800
+    GD =_FakeGameData({"T": (800, ["A", "B"]), "A": (300, ["a", "a"]), "B": (500, ["a"]), "a": (400, [])})
+
+    def test_owned_component_reduces_cost(self):
+        plan = buy_plan(self.GD, "T", ["a"], 3000)
+        # 전체 2800 - 보유한 a 400
+        self.assertTrue(plan["complete"])
+        self.assertEqual(plan["cost"], 2400)
+        self.assertEqual(plan["buy"], [("T", 2400)])
+
+    def test_partial_buys_most_expensive_affordable_component(self):
+        plan = buy_plan(self.GD, "T", [], 1000)
+        self.assertFalse(plan["complete"])
+        # A(1100)는 못 사므로 B(900)를 사고, 남은 100으로는 아무것도 못 산다
+        self.assertEqual(plan["buy"], [("B", 900)])
+        self.assertEqual(plan["left"], 100)
+
+    def test_full_inventory_blocks_components(self):
+        plan = buy_plan(self.GD, "T", ["x1", "x2", "x3", "x4", "x5", "x6"], 1000)
+        self.assertEqual(plan["buy"], [])
+        self.assertTrue(plan["full"])
+
+
+class SupportAndHistoryTest(unittest.TestCase):
+    def test_support_power_grows_with_heal_shield(self):
+        base = {"heal_shield": 0.0, "ah": 0.0, "ap": 0.0}
+        self.assertGreater(support_power(dict(base, heal_shield=0.1)), support_power(base))
+
+    def test_auto_role_enchanter(self):
+        self.assertEqual(auto_role({"tags": ["Support", "Mage"]}), "enchanter")
+        self.assertEqual(auto_role({"tags": ["Support", "Tank"]}), "tank")
+
+    def test_augment_without_stats_uses_mean(self):
+        augments = [{"name": "통계", "desc": "", "performance": 100, "popular": 0.1, "tier": 4},
+                    {"name": "없음", "desc": "", "performance": 0, "popular": 0, "tier": "-"}]
+        picks = recommend_augments(augments, "dealer", "ap", TeamProfile(), TeamProfile(),
+                                   top=2, min_popular=0, mean=90)
+        self.assertAlmostEqual(next(p for p in picks if p["name"] == "없음")["score"], 90)
+
+    def test_follow_rate(self):
+        game = {"reports": [{"items": ["신발"], "recommended": ["라바돈", "존야"]},
+                            {"items": ["신발", "라바돈"], "recommended": ["존야"]}],
+                "final_items": ["신발", "라바돈", "공허"]}
+        self.assertEqual(history.follow_rate(game), 0.5)
+        self.assertIsNone(history.follow_rate({"reports": [], "final_items": []}))
+
+    def test_speech_starts_with_buy_now(self):
+        text = notify.speech_text({"items": ["라바돈"], "augments": [], "buy_now": ["증폭의 고서"]})
+        self.assertTrue(text.startswith("지금 구매 증폭의 고서"))
+
+
+class LiveExtrasTest(unittest.TestCase):
+    def test_spells_and_killers(self):
+        player = {"summonerSpells": {
+            "summonerSpellOne": {"displayName": "점화", "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerDot_DisplayName"},
+            "summonerSpellTwo": {"displayName": "표식", "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"}}}
+        self.assertEqual(live._spells(player), ["ignite"])
+        events = [{"EventName": "ChampionKill", "KillerName": "적", "VictimName": "나"},
+                  {"EventName": "ChampionKill", "KillerName": "적", "VictimName": "남"},
+                  {"EventName": "ChampionKill", "KillerName": "적", "VictimName": "나"}]
+        self.assertEqual(live._killers_of(events, {"나#KR1", "나"})["적"], 2)
+        self.assertEqual(live._player_names({"riotId": "나#KR1"}), {"나#KR1", "나"})
 
 
 if __name__ == "__main__":

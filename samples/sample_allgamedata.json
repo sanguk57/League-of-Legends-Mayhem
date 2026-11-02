@@ -12,31 +12,380 @@
       "attackSpeed": 0.78,
       "critChance": 0.0,
       "abilityHaste": 15.0
-    }
+    },
+    "currentGold": 1300.0
   },
   "allPlayers": [
-    {"riotId": "나#KR1", "summonerName": "나#KR1", "championName": "아리", "rawChampionName": "game_character_displayname_Ahri",
-     "isDead": true, "respawnTimer": 12.4,
-     "team": "ORDER", "level": 11,
-     "items": [{"itemID": 3020, "count": 1}, {"itemID": 6655, "count": 1}, {"itemID": 1052, "count": 1}]},
-    {"riotId": "아군1#KR1", "championName": "가렌", "rawChampionName": "game_character_displayname_Garen",
-     "team": "ORDER", "level": 12, "items": [{"itemID": 3047, "count": 1}, {"itemID": 3053, "count": 1}]},
-    {"riotId": "아군2#KR1", "championName": "소나", "rawChampionName": "game_character_displayname_Sona",
-     "team": "ORDER", "level": 10, "items": [{"itemID": 3158, "count": 1}]},
-    {"riotId": "아군3#KR1", "championName": "케이틀린", "rawChampionName": "game_character_displayname_Caitlyn",
-     "team": "ORDER", "level": 11, "items": [{"itemID": 3006, "count": 1}, {"itemID": 3031, "count": 1}]},
-    {"riotId": "아군4#KR1", "championName": "제드", "rawChampionName": "game_character_displayname_Zed",
-     "team": "ORDER", "level": 11, "items": [{"itemID": 3071, "count": 1}]},
-    {"riotId": "적1#KR1", "championName": "소라카", "rawChampionName": "game_character_displayname_Soraka",
-     "team": "CHAOS", "level": 10, "items": [{"itemID": 3107, "count": 1}]},
-    {"riotId": "적2#KR1", "championName": "블라디미르", "rawChampionName": "game_character_displayname_Vladimir",
-     "team": "CHAOS", "level": 12, "items": [{"itemID": 6653, "count": 1}, {"itemID": 3020, "count": 1}]},
-    {"riotId": "적3#KR1", "championName": "말파이트", "rawChampionName": "game_character_displayname_Malphite",
-     "team": "CHAOS", "level": 11, "items": [{"itemID": 3075, "count": 1}, {"itemID": 3047, "count": 1}]},
-    {"riotId": "적4#KR1", "championName": "이즈리얼", "rawChampionName": "game_character_displayname_Ezreal",
-     "team": "CHAOS", "level": 11, "items": [{"itemID": 3078, "count": 1}]},
-    {"riotId": "적5#KR1", "championName": "애쉬", "rawChampionName": "game_character_displayname_Ashe",
-     "team": "CHAOS", "level": 11, "items": [{"itemID": 3031, "count": 1}, {"itemID": 3006, "count": 1}]}
+    {
+      "riotId": "나#KR1",
+      "summonerName": "나#KR1",
+      "championName": "아리",
+      "rawChampionName": "game_character_displayname_Ahri",
+      "isDead": true,
+      "respawnTimer": 12.4,
+      "team": "ORDER",
+      "level": 11,
+      "items": [
+        {
+          "itemID": 3020,
+          "count": 1
+        },
+        {
+          "itemID": 6655,
+          "count": 1
+        },
+        {
+          "itemID": 1052,
+          "count": 1
+        }
+      ],
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "점멸",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "표식",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        }
+      },
+      "scores": {
+        "kills": 3,
+        "deaths": 6,
+        "assists": 8,
+        "creepScore": 20,
+        "wardScore": 0
+      }
+    },
+    {
+      "riotId": "아군1#KR1",
+      "championName": "가렌",
+      "rawChampionName": "game_character_displayname_Garen",
+      "team": "ORDER",
+      "level": 12,
+      "items": [
+        {
+          "itemID": 3047,
+          "count": 1
+        },
+        {
+          "itemID": 3053,
+          "count": 1
+        }
+      ],
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "회복",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerHeal_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "표식",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        }
+      },
+      "scores": {
+        "kills": 2,
+        "deaths": 4,
+        "assists": 7,
+        "creepScore": 20,
+        "wardScore": 0
+      }
+    },
+    {
+      "riotId": "아군2#KR1",
+      "championName": "소나",
+      "rawChampionName": "game_character_displayname_Sona",
+      "team": "ORDER",
+      "level": 10,
+      "items": [
+        {
+          "itemID": 3158,
+          "count": 1
+        }
+      ],
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "점멸",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "표식",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        }
+      },
+      "scores": {
+        "kills": 1,
+        "deaths": 3,
+        "assists": 10,
+        "creepScore": 20,
+        "wardScore": 0
+      }
+    },
+    {
+      "riotId": "아군3#KR1",
+      "championName": "케이틀린",
+      "rawChampionName": "game_character_displayname_Caitlyn",
+      "team": "ORDER",
+      "level": 11,
+      "items": [
+        {
+          "itemID": 3006,
+          "count": 1
+        },
+        {
+          "itemID": 3031,
+          "count": 1
+        }
+      ],
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "점화",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerDot_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "표식",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        }
+      },
+      "scores": {
+        "kills": 5,
+        "deaths": 5,
+        "assists": 6,
+        "creepScore": 20,
+        "wardScore": 0
+      }
+    },
+    {
+      "riotId": "아군4#KR1",
+      "championName": "제드",
+      "rawChampionName": "game_character_displayname_Zed",
+      "team": "ORDER",
+      "level": 11,
+      "items": [
+        {
+          "itemID": 3071,
+          "count": 1
+        }
+      ],
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "점멸",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "표식",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        }
+      },
+      "scores": {
+        "kills": 6,
+        "deaths": 4,
+        "assists": 5,
+        "creepScore": 20,
+        "wardScore": 0
+      }
+    },
+    {
+      "riotId": "적1#KR1",
+      "championName": "소라카",
+      "rawChampionName": "game_character_displayname_Soraka",
+      "team": "CHAOS",
+      "level": 10,
+      "items": [
+        {
+          "itemID": 3107,
+          "count": 1
+        }
+      ],
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "회복",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerHeal_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "표식",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        }
+      },
+      "scores": {
+        "kills": 1,
+        "deaths": 5,
+        "assists": 12,
+        "creepScore": 20,
+        "wardScore": 0
+      }
+    },
+    {
+      "riotId": "적2#KR1",
+      "championName": "블라디미르",
+      "rawChampionName": "game_character_displayname_Vladimir",
+      "team": "CHAOS",
+      "level": 12,
+      "items": [
+        {
+          "itemID": 6653,
+          "count": 1
+        },
+        {
+          "itemID": 3020,
+          "count": 1
+        }
+      ],
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "점화",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerDot_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "표식",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        }
+      },
+      "scores": {
+        "kills": 6,
+        "deaths": 3,
+        "assists": 4,
+        "creepScore": 20,
+        "wardScore": 0
+      }
+    },
+    {
+      "riotId": "적3#KR1",
+      "championName": "말파이트",
+      "rawChampionName": "game_character_displayname_Malphite",
+      "team": "CHAOS",
+      "level": 11,
+      "items": [
+        {
+          "itemID": 3075,
+          "count": 1
+        },
+        {
+          "itemID": 3047,
+          "count": 1
+        }
+      ],
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "점화",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerDot_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "표식",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        }
+      },
+      "scores": {
+        "kills": 2,
+        "deaths": 5,
+        "assists": 9,
+        "creepScore": 20,
+        "wardScore": 0
+      }
+    },
+    {
+      "riotId": "적4#KR1",
+      "championName": "이즈리얼",
+      "rawChampionName": "game_character_displayname_Ezreal",
+      "team": "CHAOS",
+      "level": 11,
+      "items": [
+        {
+          "itemID": 3078,
+          "count": 1
+        }
+      ],
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "점멸",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "표식",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        }
+      },
+      "scores": {
+        "kills": 5,
+        "deaths": 4,
+        "assists": 6,
+        "creepScore": 20,
+        "wardScore": 0
+      }
+    },
+    {
+      "riotId": "적5#KR1",
+      "championName": "애쉬",
+      "rawChampionName": "game_character_displayname_Ashe",
+      "team": "CHAOS",
+      "level": 11,
+      "items": [
+        {
+          "itemID": 3031,
+          "count": 1
+        },
+        {
+          "itemID": 3006,
+          "count": 1
+        }
+      ],
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "방어막",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerBarrier_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "표식",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        }
+      },
+      "scores": {
+        "kills": 9,
+        "deaths": 3,
+        "assists": 5,
+        "creepScore": 20,
+        "wardScore": 0
+      }
+    }
   ],
-  "gameData": {"gameMode": "ARAM", "gameTime": 754.2, "mapNumber": 12}
+  "gameData": {
+    "gameMode": "ARAM",
+    "gameTime": 754.2,
+    "mapNumber": 12
+  },
+  "events": {
+    "Events": [
+      {
+        "EventID": 0,
+        "EventName": "GameStart",
+        "EventTime": 0.05
+      },
+      {
+        "EventID": 1,
+        "EventName": "ChampionKill",
+        "EventTime": 300.1,
+        "KillerName": "적5",
+        "VictimName": "나",
+        "Assisters": []
+      },
+      {
+        "EventID": 2,
+        "EventName": "ChampionKill",
+        "EventTime": 512.4,
+        "KillerName": "적5",
+        "VictimName": "나",
+        "Assisters": [
+          "적2"
+        ]
+      },
+      {
+        "EventID": 3,
+        "EventName": "ChampionKill",
+        "EventTime": 740.0,
+        "KillerName": "적2",
+        "VictimName": "나",
+        "Assisters": []
+      }
+    ]
+  }
 }

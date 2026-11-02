@@ -55,6 +55,46 @@ def item_stats(item):
     return dict(_parse_stats(item["description"]))
 
 
+# 고유 효과를 같은 가치의 스탯으로 바꾼 근사값 (아이템 ID -> 추가 스탯).
+# 스탯 블록에 없는 기본 공격 추가 피해, 스킬 강화, 보호막 등을 대략 반영한다.
+UNIQUE_EFFECTS = {
+    "3153": {"ad": 25},                  # 몰락한 왕의 검: 현재 체력 비례 적중 피해
+    "3115": {"ap": 35},                  # 내셔의 이빨: 적중 시 마법 피해
+    "3091": {"ad": 20},                  # 마법사의 최후: 적중 시 마법 피해
+    "3124": {"as": 0.2},                 # 구인수의 격노검: 적중 효과 강화
+    "6672": {"ad": 25},                  # 크라켄 학살자: 세 번째 공격 추가 피해
+    "3078": {"ad": 30},                  # 삼위일체: 주문검
+    "3508": {"ad": 20},                  # 정수 약탈자: 주문검
+    "3100": {"ap": 40},                  # 리치베인: 주문검
+    "4633": {"ap": 25, "omnivamp": 0.05},  # 균열 생성기: 전투 중 피해 증폭
+    "6653": {"ap": 30},                  # 리안드리의 고통: 최대 체력 비례 화상
+    "3074": {"ad": 20},                  # 굶주린 히드라: 광역 피해
+    "3748": {"ad": 25},                  # 거대한 히드라: 체력 비례 광역 피해
+    "3071": {"apen_pct": 0.15},          # 칠흑의 양날 도끼: 방어력 감소 중첩
+    "3036": {"apen_pct": 0.05},          # 도미닉 경의 인사: 체력 높은 대상 추가 피해
+    "6676": {"ad": 15},                  # 징수의 총: 처형
+    "3053": {"hp": 350},                 # 스테락의 도전: 보호막
+    "3156": {"mr": 25},                  # 맬모셔스의 아귀: 마법 보호막
+    "3102": {"mr": 15},                  # 밴시의 장막: 주문 보호막
+    "3157": {"hp": 200},                 # 존야의 모래시계: 경직
+    "3083": {"hp": 250},                 # 워모그의 갑옷: 체력 회복
+}
+
+
+def model_stats(item_id, item):
+    """계산 모델에 쓰는 스탯: 스탯 블록 + 고유 효과 근사값."""
+    st = item_stats(item)
+    for k, v in UNIQUE_EFFECTS.get(str(item_id), {}).items():
+        st[k] = st.get(k, 0.0) + v
+    return st
+
+
+def is_inventory_item(item):
+    """6칸을 차지하는 아이템인지 (소모품·장신구·포로 간식 제외)."""
+    tags = item.get("tags", [])
+    return item["gold"]["total"] > 0 and "Consumable" not in tags and "Trinket" not in tags
+
+
 def item_flags(item):
     """상황 판단에 쓰는 아이템 특징."""
     text = strip_tags(item["description"])
@@ -71,6 +111,8 @@ def item_flags(item):
         flags.add("max_hp_dmg")
     if "치명타로 받는 피해" in text:
         flags.add("anti_crit")
+    if re.search(r"아군[^.]{0,40}(보호막|회복|공격 속도|이동 속도|주문력)", text):
+        flags.add("ally_buff")
     return flags
 
 
@@ -101,13 +143,14 @@ def _growth(level):
     return (level - 1) * (0.7025 + 0.0175 * (level - 1))
 
 
-def compute_stats(gd, champion, level, item_ids):
-    """챔피언 기본 스탯 + 아이템 스탯 합계."""
+def compute_stats(gd, champion, level, item_ids, unique=True):
+    """챔피언 기본 스탯 + 아이템 스탯 합계. unique=True면 고유 효과 근사값을 더한다."""
     base = champion["stats"]
     g = _growth(level)
     total = {}
     for iid in item_ids:
-        for k, v in item_stats(gd.items[iid]).items():
+        st = model_stats(iid, gd.items[iid]) if unique else item_stats(gd.items[iid])
+        for k, v in st.items():
             total[k] = total.get(k, 0.0) + v
 
     def item(k):
@@ -152,16 +195,24 @@ class Unit:
         self.augment_names = list(augment_names)
         # 증강 카탈로그로 해석한 결과 ({name, desc, effects, ...})
         self.augments = []
-        # 게임 중 실제 스탯(증강 효과 포함)과 계산값의 차이를 보정값으로 저장
+        # 게임 중 기록: 킬/데스/어시스트, 나를 처치한 횟수, 소환사 주문 ("ignite" 등)
+        self.kills = self.deaths = self.assists = 0
+        self.killed_me = 0
+        self.spells = []
+        # 게임 중 실제 스탯(증강 효과 포함)과 계산값의 차이를 보정값으로 저장.
+        # 고유 효과 근사값은 실제 스탯에 없으므로 빼고 비교한다.
         self._offset = {}
         if live_stats:
-            calc = compute_stats(gd, champion, level, self.item_ids)
+            calc = compute_stats(gd, champion, level, self.item_ids, unique=False)
             for live_key, key in LIVE_STAT_KEYS.items():
                 if live_key in live_stats:
                     self._offset[key] = live_stats[live_key] - calc[key]
 
-    def stats(self, extra_ids=()):
-        st = compute_stats(self.gd, self.champion, self.level, self.item_ids + list(extra_ids))
+    def stats(self, extra_ids=(), without=()):
+        ids = list(self.item_ids)
+        for iid in without:
+            ids.remove(iid)
+        st = compute_stats(self.gd, self.champion, self.level, ids + list(extra_ids))
         for k, v in self._offset.items():
             st[k] += v
         st["crit"] = min(1.0, max(0.0, st["crit"]))
@@ -169,6 +220,9 @@ class Unit:
 
     def items(self):
         return [self.gd.items[i] for i in self.item_ids]
+
+    def inventory_ids(self):
+        return [i for i in self.item_ids if is_inventory_item(self.gd.items[i])]
 
     def item_total(self):
         total = {}

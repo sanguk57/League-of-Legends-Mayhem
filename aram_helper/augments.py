@@ -15,6 +15,7 @@ from .stats import strip_tags
 CDRAGON = "https://raw.communitydragon.org/latest"
 NAMES_URL = f"{CDRAGON}/plugins/rcp-be-lol-game-data/global/ko_kr/v1/cherry-augments.json"
 ARENA_URL = f"{CDRAGON}/cdragon/arena/ko_kr.json"
+ASSET_URL = f"{CDRAGON}/plugins/rcp-be-lol-game-data/global/default"
 CACHE_DIR = DATA_DIR / "cdragon"
 CACHE_TTL = 3 * 24 * 3600
 
@@ -62,13 +63,21 @@ def _cached(name, url, refresh=False):
     return data
 
 
+def icon_url(path):
+    """게임 파일 경로(/lol-game-data/assets/ASSETS/...)를 CommunityDragon 주소로 (소문자 경로)."""
+    if not path:
+        return None
+    return ASSET_URL + path.replace("/lol-game-data/assets", "").lower()
+
+
 class AugmentCatalog:
     def __init__(self, entries, arena_descs):
         self.by_id = {}
         self._by_name = {}
         for e in entries:
             aug = {"id": e["id"], "name": e["nameTRA"], "api": e.get("augmentNameId", ""),
-                   "rarity": e.get("rarity", ""), "desc": arena_descs.get(e.get("augmentNameId"), "")}
+                   "rarity": e.get("rarity", ""), "desc": arena_descs.get(e.get("augmentNameId"), ""),
+                   "icon": icon_url(e.get("augmentSmallIconPath"))}
             self.by_id[e["id"]] = aug
             self._by_name.setdefault(normalize(aug["name"]), []).append(aug)
 

@@ -3,6 +3,7 @@
 import json
 import ssl
 import urllib.request
+from collections import Counter
 
 from .stats import Unit
 
@@ -52,7 +53,37 @@ def _augment_names(player):
 
 
 def _player_names(player):
-    return {player.get(k) for k in ("riotId", "summonerName", "riotIdGameName") if player.get(k)}
+    """비교용 이름들. 이벤트 로그에는 태그(#KR1) 없이 나오기도 하므로 둘 다 넣는다."""
+    names = {player.get(k) for k in ("riotId", "summonerName", "riotIdGameName") if player.get(k)}
+    return names | {n.split("#")[0] for n in names}
+
+
+# 소환사 주문: rawDisplayName에 들어 있는 내부 이름 또는 한국어 표시 이름 -> 키
+SPELL_KEYS = {"SummonerDot": "ignite", "SummonerExhaust": "exhaust", "SummonerHeal": "heal",
+              "SummonerBarrier": "barrier", "SummonerBoost": "cleanse"}
+SPELL_NAMES = {"점화": "ignite", "탈진": "exhaust", "회복": "heal", "방어막": "barrier", "정화": "cleanse"}
+
+
+def _spells(player):
+    out = []
+    for slot in (player.get("summonerSpells") or {}).values():
+        raw = slot.get("rawDisplayName", "")
+        key = next((v for k, v in SPELL_KEYS.items() if k in raw), None)
+        key = key or SPELL_NAMES.get(slot.get("displayName", ""))
+        if key:
+            out.append(key)
+    return out
+
+
+def _events(data):
+    events = data.get("events") or {}
+    return events.get("Events", []) if isinstance(events, dict) else events
+
+
+def _killers_of(events, names):
+    """names(나)를 처치한 플레이어 이름별 횟수."""
+    return Counter(e.get("KillerName") for e in events
+                   if e.get("EventName") == "ChampionKill" and e.get("VictimName") in names)
 
 
 def parse_game(gd, data):
@@ -64,16 +95,26 @@ def parse_game(gd, data):
     if me_raw is None:
         raise ValueError("게임 데이터에서 내 챔피언을 찾지 못했습니다.")
 
+    events = _events(data)
+    killers = _killers_of(events, _player_names(me_raw))
+
     def unit(p, live_stats=None):
-        return Unit(gd, _champion(gd, p), p.get("level", 1), _item_ids(gd, p),
-                    live_stats=live_stats, name=p.get("riotId") or p.get("summonerName"),
-                    augment_names=_augment_names(p))
+        u = Unit(gd, _champion(gd, p), p.get("level", 1), _item_ids(gd, p),
+                 live_stats=live_stats, name=p.get("riotId") or p.get("summonerName"),
+                 augment_names=_augment_names(p))
+        scores = p.get("scores") or {}
+        u.kills, u.deaths, u.assists = (scores.get(k, 0) for k in ("kills", "deaths", "assists"))
+        u.spells = _spells(p)
+        u.killed_me = sum(killers[n] for n in _player_names(p))
+        return u
 
     me = unit(me_raw, active.get("championStats"))
     me.augment_names += [n for n in _augment_names(active) if n not in me.augment_names]
     allies = [unit(p) for p in players if p is not me_raw and p.get("team") == me_raw.get("team")]
     enemies = [unit(p) for p in players if p.get("team") != me_raw.get("team")]
     game = data.get("gameData", {})
+    result = next((e.get("Result") for e in events if e.get("EventName") == "GameEnd"), None)
     info = {"mode": game.get("gameMode"), "time": game.get("gameTime", 0),
-            "dead": bool(me_raw.get("isDead")), "respawn": me_raw.get("respawnTimer", 0)}
+            "dead": bool(me_raw.get("isDead")), "respawn": me_raw.get("respawnTimer", 0),
+            "gold": active.get("currentGold"), "result": result}
     return me, allies, enemies, info
