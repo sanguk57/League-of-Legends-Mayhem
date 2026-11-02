@@ -395,8 +395,13 @@ def cmd_live(args):
     use_opgg = not args.no_opgg
     board = None
     if args.serve:
-        board = notify.WebBoard(args.serve)
-        print("추천 웹페이지: " + " , ".join(board.urls()))
+        try:
+            board = notify.WebBoard(args.serve)
+            print("추천 웹페이지: " + " , ".join(board.urls()))
+        except OSError as e:
+            # 이미 다른 창(로그인 시 자동 실행 등)이 같은 포트로 실행 중일 때
+            print(f"[경고] 웹페이지를 {args.serve}번 포트로 열지 못했습니다 ({e}). "
+                  f"이미 실행 중인 창이 있는지 확인하세요. 웹페이지 없이 계속합니다.", file=sys.stderr)
     levels = sorted(int(x) for x in args.augment_levels.split(",") if x.strip())
     game = None      # 진행 중인 게임 상태
     waiting = False

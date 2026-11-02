@@ -57,6 +57,12 @@ def speech_text(summary, items=2, augments=2):
     return ". ".join(parts) + "." if parts else "추천할 아이템이 없습니다."
 
 
+class _Server(ThreadingHTTPServer):
+    # Windows에서는 주소 재사용을 켜면 두 프로그램이 같은 포트를 동시에 열 수 있으므로 끈다
+    allow_reuse_address = False
+    daemon_threads = True
+
+
 # 추천 웹페이지: web/index.html이 /data(JSON)를 3초마다 받아 화면을 다시 그린다
 _INDEX = Path(__file__).with_name("web") / "index.html"
 
@@ -111,7 +117,7 @@ class WebBoard:
             def log_message(self, *args):
                 pass
 
-        self.server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+        self.server = _Server(("0.0.0.0", port), Handler)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
     def rank(self, choices):
