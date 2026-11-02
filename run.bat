@@ -89,11 +89,13 @@ exit /b
 
 :find_python
 rem py 런처 → python → 기본 설치 위치 순서로 찾는다 (설치 직후에는 PATH가 반영되지 않으므로)
+rem Python 3.8 미만은 없는 것으로 본다
 set "PY="
-where py >nul 2>nul && py -3 -c "import sys" >nul 2>nul && set "PY=py -3"
-if not defined PY python -c "import sys" >nul 2>nul && set "PY=python"
-if not defined PY if exist "%LOCALAPPDATA%\Programs\Python\Launcher\py.exe" set "PY="%LOCALAPPDATA%\Programs\Python\Launcher\py.exe" -3"
-if not defined PY for /d %%D in ("%LOCALAPPDATA%\Programs\Python\Python3*") do if exist "%%D\python.exe" set "PY="%%D\python.exe""
+set "PYCHECK=import sys; sys.exit(sys.version_info < (3, 8))"
+where py >nul 2>nul && py -3 -c "%PYCHECK%" >nul 2>nul && set "PY=py -3"
+if not defined PY python -c "%PYCHECK%" >nul 2>nul && set "PY=python"
+if not defined PY if exist "%LOCALAPPDATA%\Programs\Python\Launcher\py.exe" "%LOCALAPPDATA%\Programs\Python\Launcher\py.exe" -3 -c "%PYCHECK%" >nul 2>nul && set "PY="%LOCALAPPDATA%\Programs\Python\Launcher\py.exe" -3"
+if not defined PY for /d %%D in ("%LOCALAPPDATA%\Programs\Python\Python3*") do "%%D\python.exe" -c "%PYCHECK%" >nul 2>nul && set "PY="%%D\python.exe""
 exit /b
 
 
